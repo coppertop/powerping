@@ -13,11 +13,30 @@
 #WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 
 #Specify one of the following OS
-CYGWIN=0
-LINUX=0
-MAC=1
+defaultip='www.google.ca'
+LINUX=1
+uname -a | grep -i linux
+if [ $? -eq 0 ]; then
+  LINUX=1
+  echo OS Linux
+else
+  LINUX=0
+fi
+
+uname -a | grep -i cygwin
+if [ $? -eq 0 ]; then
+  CYGWIN=1
+  echo OS Cygwin
+fi
+
+#darwin kernels are made by apple
+uname -a | grep -i darwin
+if [ $? -eq 0 ]; then
+  MAC=1
+  echo OS MAC
+fi
 #linux ping is from iputils
-#gawk must also be installed
+#awk must also be installed
 
 #echo -e '\E[37;44m'"\033[1mContact List\033[0m"
 if [ $MAC -eq 1 ]; then
@@ -26,16 +45,61 @@ else
   esc="\E"
 fi
 
-#black='\E[30;47m'
-black='$esc[30;47m'
-red='$esc[31;47m'
-green='$esc[32;47m'
-yellow='$esc[33;47m'
-blue='$esc[34;47m'
-magenta='$esc[35;47m'
-cyan='$esc[36;47m'
-white='$esc[37;47m'
+if [ "$3" == "nocolor" ]; then
+ color 0
+fi
 
+
+color () {
+
+ colorize=$1
+ 
+ if [ $colorize -eq 1 ]; then
+  #black='\E[30;47m'
+  black='$esc[30;47m'
+  red='$esc[31;47m'
+  green='$esc[32;47m'
+  yellow='$esc[33;47m'
+  blue='$esc[34;47m'
+  magenta='$esc[35;47m'
+  cyan='$esc[36;47m'
+  white='$esc[37;47m'
+  
+  #normal="$esc[0m\033[0m"
+  normal="$esc[0m"
+  bold="$esc[1m"
+  blackonwhite="$esc[30;47m"
+  yellowonred="$esc[45;36m"
+  yellowonblack="$esc[33;40m"
+  blackonred="$esc[30;41m"
+  grayonblue="$esc[33;44m"
+  whiteonred="$esc[41;38"
+  blackongreen="$esc[30;46"
+ else
+  #black='\E[30;47m'
+  black=''
+  red=''
+  green=''
+  yellow=''
+  blue=''
+  magenta=''
+  cyan=''
+  white=''
+  
+  #normal="$esc[0m\033[0m"
+  normal="$esc[0m"
+  bold=""
+  blackonwhite=""
+  yellowonred=""
+  yellowonblack=""
+  blackonred=""
+  grayonblue=""
+  whiteonred=""
+  blackongreen=""
+ 
+ fi
+
+}
 
 passed=0
 cnt=0
@@ -50,28 +114,29 @@ connconn()
  if [ $consecutivefailed -eq 0 ]; then
    stconn="connection state unknown"
    if [ $consecutivepassed -ge 100 ]; then
-     stconn="$esc[30;47m$esc[1mconn excellent$esc[0m\033[0m"
+     stconn="$blackonwhite$bold conn excellent$normal"
    else
      if [ $consecutivepassed -ge 10 ]; then
-       stconn="$esc[45;36$esc[1mconn good$esc[0m\033[0m"
+       stconn="$blackongreen$bold conn good$normal"
      else
        if [ $consecutivepassed -ge 5 ]; then
-         stconn="$esc[33;40m$esc[1mconn ok$esc[0m\033[0m"
+#         stconn="$esc[33;40m$esc[1mconn ok$esc[0m\033[0m"
+         stconn="$yellowonblack$bold conn ok$normal"
        else
          if [ $consecutivepassed -ge 2 ]; then
-           stconn="$esc[33;40m$esc[1mconn almost ok$esc[0m\033[0m"
+           stconn="$yellowonblack$bold conn almost ok$normal"
          fi
        fi
      fi
    fi
  else
-   stconn="$esc[33;47mconnection usable$esc[1m$esc[0m\033[0m"
+   stconn="$yellowonred connection usable$esc[1m$normal"
    if [ $consecutivefailed -ge 3 ]; then
      stconn="connection somewhat usable"
      if [ $consecutivefailed -ge 5 ]; then
        stconn="connection mostly unusable"
        if [ $consecutivefailed -ge 10 ]; then
-         stconn="$esc[33;47mconnection completely unusable$esc[1m$esc[0m\033[0m"
+         stconn="$blackonred connection completely unusable$esc[1m$normal"
        fi
      fi
    fi
@@ -92,15 +157,19 @@ on_die()
 
 helptext()
 {
+  clear
   echo ===========
   echo $0 Help
   echo   q to quit
   echo   h for help
+  echo   c toggle color
   echo   s summary results
   echo ===========
 }
 
 echo starting `date` > $file 
+
+color 1 
 
 trap 'on_die' SIGHUP SIGINT SIGTERM
 
@@ -127,9 +196,31 @@ fi
 if [ "$2" == "line" ]; then
   clear
 fi
-stty -icanon -echo min 0 time 4
 
-echo -en "pinging..."
+stty -icanon -echo min 0 time 4
+pinghost=$1
+
+echo -en "pinging $pinghost..."
+pstat=1
+if [ $LINUX -eq 1 ]; then
+  # rtt min/avg/max/mdev = 24.631/24.631/24.631/0.000 ms
+  ping -c 1 $pinghost 2>&1 > /dev/null
+  pstat=$?
+else 
+  if [ $MAC -eq 1 ]; then
+    ping -s 64 -c 1 $pinghost 2>&1 > /dev/null
+    pstat=$?
+  else
+    ping $1 64 1 2>&1 > /dev/null
+    pstat=$?
+  fi
+fi
+
+if [ $pstat -ne 0 ]; then
+  echo could not reach $1... ...defaulting to $defaultip
+  pinghost=$defaultip
+fi
+
 while [ 1 ]; do
 # read -t 1 inch <&1
  read -t 1 inch
@@ -140,44 +231,66 @@ while [ 1 ]; do
     on_die
   fi
   if [ $inch == "s" ]; then
-    echo Summary: $passed passed in $cnt tries `date`.
+    clear
+    echo -en "$passed passed in $cnt tries `date`.<press return>"
+    stty sane
+    read inch
+    stty -icanon -echo min 0 time 4
+    clear
+    echo -en "pinging $pinghost..."
   else
     helptext
+    echo -en "<press return>"
+    stty sane
+    read inch
+    stty -icanon -echo min 0 time 4
+    clear
+    echo -en "pinging $pinghost..."
+    continue
   fi
 
  fi
+
  if [ $LINUX -eq 1 ]; then
    # rtt min/avg/max/mdev = 24.631/24.631/24.631/0.000 ms
-   tms=`ping -c 1 $1 | grep rtt | awk -F= '{print $2}' | awk -F. '{print $1}'`
-   ping -c 1 $1 | grep rtt
+   tms=`ping -c 1 $pinghost 2>&1 | grep rtt | awk -F= '{print $2}' | awk -F. '{print $1}'`
+#   ping -c 1 $1 | grep rtt
  else 
    if [ $MAC -eq 1 ]; then
-     tms=`ping -s 64 -c 1 $1 | grep time= | awk -F= '{print $4}' | awk '{print $1}'`
+     tms=`ping -s 64 -c 1 $pinghost 2>&1 | grep time= | awk -F= '{print $4}' | awk '{print $1}' | awk -F. '{print $1}'`
    else
-     tms=`ping $1 64 1 | grep time= | awk -F= '{print $4}' | awk '{print $1}'`
+     tms=`ping $pinghost 64 1 2>&1 | grep time= | awk -F= '{print $4}' | awk '{print $1}'`
    fi
  fi
 
- tms=51
+# tms=51
 
- if [ $tms -gt 50 ]; then
-   rt="-"
-   tmsStr="$esc[33;40m$esc[1m$tms$esc[0m\033[0m"
-   if [ $tms -gt 500 ]; then
-     rt="--"
-     tmsStr="$esc[30;41m$esc[1m$esc[5m$tms$esc[0m\033[0m"
-   fi
+ if [ -z $tms ]; then
+  tms=0
  else
-   rt="$esc[1m+$esc[0m"
-   tmsStr="$esc[32;47m$esc[1m$tms$esc[0m\033[0m"
+  if [ $tms -gt 50 ]; then
+    rt="-"
+    # 30;46 bg:green fg:black
+    tmsStr="$blackongreen$bold$tms$normal"
+    if [ $tms -gt 300 ]; then
+      rt="--"
+      # 33:44 is bg:blue fg:white
+      # 41;38 is bg:red fg:white
+      tmsStr="$whiteonred$bold$esc[5m$tms$normal"
+    fi
+  else
+    rt="$bold+$esc[0m"
+    tmsStr="$grayonblue$bold$tms$normal"
+  fi
  fi
+
  if [ $LINUX -eq 1 ]; then
-   ping -c 1 $1  > /dev/null
+   ping -c 1 $pinghost  > /dev/null
  else
    if [ $MAC -eq 1 ]; then
-     ping -c 1 -s 64 $1 | grep " 0.0%" > /dev/null
+     ping -c 1 -s 64 $pinghost 2>&1 | grep " 0.0%" > /dev/null
    else
-     ping $1 64 1 | grep " 0.0%" > /dev/null
+     ping $pinghost 64 1 | grep " 0.0%" > /dev/null
    fi
  fi
  pstat=$?
@@ -191,9 +304,9 @@ while [ 1 ]; do
    sleep 1
  else
    if [ $consecutivepassed -eq 0 ]; then
-    a=1
+     a=1
    else
-     echo passed $consecutivepassed in a row.
+     echo -en "passed $consecutivepassed in a row."
      consecutivepassed=0
    fi
    (( consecutivefailed += 1 ))
